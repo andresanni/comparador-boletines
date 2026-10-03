@@ -53,6 +53,9 @@ export function compareBoletines(
   if (manual.estudiante.seccion && app.estudiante.seccion) {
     addDiff('Estudiante', 'Sección', manual.estudiante.seccion, app.estudiante.seccion);
   }
+  if (manual.estudiante.ciclo && app.estudiante.ciclo) {
+    addDiff('Estudiante', 'Ciclo', manual.estudiante.ciclo, app.estudiante.ciclo);
+  }
 
   // 2. Apoyos e Integración
   addDiff(
@@ -221,6 +224,7 @@ export function compareBoletines(
     studentDni,
     grado: manual.estudiante.grado || app.estudiante.grado || '',
     seccion: manual.estudiante.seccion || app.estudiante.seccion || '',
+    ciclo: manual.estudiante.ciclo || app.estudiante.ciclo || '',
     differences,
     isMatch: differences.length === 0,
     manualData: manual,

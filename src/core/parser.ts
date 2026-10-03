@@ -152,6 +152,24 @@ export async function parseBoletinPDF(
     if (respItems.length > 0) {
       estudiante.responsable = cleanText(respItems.map((i) => i.str).join(' '));
     }
+
+    // Ciclo (1er Ciclo / 2do Ciclo)
+    const cicloItem = p1Items.find((i) => /([12]do?|[12]er)\s*Ciclo/i.test(i.str));
+    if (cicloItem) {
+      const m = cicloItem.str.match(/([12]do?|[12]er)\s*Ciclo/i);
+      if (m) estudiante.ciclo = m[0];
+    }
+    if (!estudiante.ciclo) {
+      const p1Full = p1Items.map((i) => i.str).join(' ');
+      const m = p1Full.match(/([12]do?|[12]er)\s*Ciclo/i);
+      if (m) {
+        estudiante.ciclo = m[0];
+      } else if (estudiante.grado) {
+        const gNum = parseInt(estudiante.grado, 10);
+        if (gNum >= 1 && gNum <= 3) estudiante.ciclo = '1er Ciclo';
+        else if (gNum >= 4 && gNum <= 7) estudiante.ciclo = '2do Ciclo';
+      }
+    }
   }
 
   // --- Dynamic Multi-Page Processing ---

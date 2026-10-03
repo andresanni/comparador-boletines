@@ -45,6 +45,16 @@ export const DiffDetail: React.FC<DiffDetailProps> = ({ result }) => {
                 {result.grado} {result.seccion}
               </span>
             )}
+            {result.ciclo && (
+              <span className="text-xs px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-medium">
+                {result.ciclo}
+              </span>
+            )}
+            {(result.manualData?.materias.length || result.appData?.materias.length) && (
+              <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                {result.manualData?.materias.length || result.appData?.materias.length} materias
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-4 text-xs text-slate-400 mt-1">
             <span>Manual: <strong className="text-slate-300">{result.manualFile}</strong></span>

@@ -79,6 +79,11 @@ export const StudentList: React.FC<StudentListProps> = ({
                       {res.grado} {res.seccion}
                     </span>
                   )}
+                  {res.ciclo && (
+                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-medium">
+                      {res.ciclo}
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-1">
                   <span>DNI: {res.studentDni}</span>

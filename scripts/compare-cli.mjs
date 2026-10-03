@@ -124,6 +124,24 @@ export async function parseBoletin(filePath) {
     estudiante.jornada = gItems[3].str;
   }
 
+  // Ciclo
+  const cicloItem = p1Items.find((i) => /([12]do?|[12]er)\s*Ciclo/i.test(i.str));
+  if (cicloItem) {
+    const m = cicloItem.str.match(/([12]do?|[12]er)\s*Ciclo/i);
+    if (m) estudiante.ciclo = m[0];
+  }
+  if (!estudiante.ciclo) {
+    const p1Full = p1Items.map((i) => i.str).join(' ');
+    const m = p1Full.match(/([12]do?|[12]er)\s*Ciclo/i);
+    if (m) {
+      estudiante.ciclo = m[0];
+    } else if (estudiante.grado) {
+      const gNum = parseInt(estudiante.grado, 10);
+      if (gNum >= 1 && gNum <= 3) estudiante.ciclo = '1er Ciclo';
+      else if (gNum >= 4 && gNum <= 7) estudiante.ciclo = '2do Ciclo';
+    }
+  }
+
   let p3Parsed = false;
   for (let pNum = 3; pNum <= numPages; pNum++) {
     const page = await doc.getPage(pNum);
@@ -361,7 +379,10 @@ async function main() {
   const man = await parseBoletin(fileMan);
   const app = await parseBoletin(fileApp);
 
-  console.log(`Estudiante: ${man.estudiante.alumno || app.estudiante.alumno} (DNI: ${man.estudiante.dni || app.estudiante.dni})`);
+  const cicloInfo = man.estudiante.ciclo || app.estudiante.ciclo || '';
+  const gradoInfo = man.estudiante.grado || app.estudiante.grado || '';
+  const seccionInfo = man.estudiante.seccion || app.estudiante.seccion || '';
+  console.log(`Estudiante: ${man.estudiante.alumno || app.estudiante.alumno} (DNI: ${man.estudiante.dni || app.estudiante.dni} | ${gradoInfo} "${seccionInfo}" | ${cicloInfo})`);
   console.log(`Materias auditadas: ${man.materias.length}`);
 
   const diffs = compare(man, app);

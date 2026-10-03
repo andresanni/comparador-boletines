@@ -35,6 +35,7 @@ export interface ComparisonResult {
   studentDni: string;
   grado: string;
   seccion: string;
+  ciclo?: string;
   differences: FieldDifference[];
   isMatch: boolean;
   manualData?: BoletinData;

@@ -7,6 +7,7 @@ export interface StudentInfo {
   jornada: string;
   responsable: string;
   año: string;
+  ciclo?: string;
 }
 
 export interface DispositivosApoyo {
