@@ -40,7 +40,7 @@ export const StudentList: React.FC<StudentListProps> = ({
   });
 
   return (
-    <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex flex-col h-[700px]">
+    <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex flex-col h-[calc(100vh-220px)] min-h-[580px]">
       {/* Search Header */}
       <div className="relative mb-3">
         <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -63,50 +63,64 @@ export const StudentList: React.FC<StudentListProps> = ({
             <div
               key={res.id}
               onClick={() => onSelect(res)}
-              className={`p-3 rounded-xl border text-left cursor-pointer transition flex items-center justify-between ${
+              className={`p-3.5 rounded-xl border text-left cursor-pointer transition group flex flex-col justify-between gap-2 ${
                 isSelected
-                  ? 'bg-indigo-950/40 border-indigo-500/60 shadow-sm'
-                  : 'bg-slate-950/40 border-slate-800/80 hover:bg-slate-800/40 hover:border-slate-700'
+                  ? 'bg-indigo-950/40 border-indigo-500/70 shadow-md ring-1 ring-indigo-500/30'
+                  : 'bg-slate-950/40 border-slate-800/80 hover:bg-slate-800/50 hover:border-slate-700'
               }`}
             >
-              <div className="min-w-0 pr-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold text-slate-200 truncate">
-                    {res.studentName}
-                  </span>
-                  {res.grado && (
-                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 font-mono">
-                      {res.grado} {res.seccion}
+              {/* Row 1: Student Name + Status badge */}
+              <div className="flex items-center justify-between gap-2">
+                <span
+                  className={`text-xs font-semibold truncate ${
+                    isSelected ? 'text-indigo-200' : 'text-slate-100 group-hover:text-white'
+                  }`}
+                  title={res.studentName}
+                >
+                  {res.studentName}
+                </span>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {res.isMatch ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                      <CheckCircle2 className="w-3 h-3" />
+                      OK
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-full">
+                      <AlertTriangle className="w-3 h-3" />
+                      {diffCount} {diffCount === 1 ? 'dif.' : 'difs.'}
                     </span>
                   )}
-                  {res.ciclo && (
-                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-medium">
-                      {res.ciclo}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-1">
-                  <span>DNI: {res.studentDni}</span>
-                  <span>•</span>
-                  <span className="truncate text-slate-500 text-[10px]" title={res.manualFile}>
-                    {res.manualFile}
-                  </span>
+                  <ChevronRight
+                    className={`w-3.5 h-3.5 transition-transform ${
+                      isSelected ? 'text-indigo-400 translate-x-0.5' : 'text-slate-600 group-hover:text-slate-400'
+                    }`}
+                  />
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
-                {res.isMatch ? (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-                    <CheckCircle2 className="w-3 h-3" />
-                    OK
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-full">
-                    <AlertTriangle className="w-3 h-3" />
-                    {diffCount} {diffCount === 1 ? 'diferencia' : 'diferencias'}
-                  </span>
+              {/* Row 2: Metadata tags */}
+              <div className="flex items-center gap-2 text-xs flex-wrap">
+                <span className="font-mono text-[11px] text-slate-400">
+                  DNI: <strong className="text-slate-300 font-normal">{res.studentDni}</strong>
+                </span>
+                {res.grado && (
+                  <>
+                    <span className="text-slate-700">•</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 font-mono border border-slate-700/60">
+                      {res.grado} {res.seccion}
+                    </span>
+                  </>
                 )}
-                <ChevronRight className="w-4 h-4 text-slate-500" />
+                {res.ciclo && (
+                  <>
+                    <span className="text-slate-700">•</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20 font-medium">
+                      {res.ciclo}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           );

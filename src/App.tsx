@@ -176,7 +176,7 @@ export function App() {
         hasData={!!summary}
       />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <main className="flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {/* If no comparison summary yet, show upload Dropzone */}
         {!summary ? (
           <div className="max-w-4xl mx-auto">
@@ -233,7 +233,7 @@ export function App() {
 
             {/* Split View: List on left, Diff Details on right */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-              <div className="lg:col-span-5">
+              <div className="lg:col-span-4 xl:col-span-4">
                 <StudentList
                   results={summary.results}
                   unmatchedManual={summary.unmatchedManual}
@@ -244,7 +244,7 @@ export function App() {
                 />
               </div>
 
-              <div className="lg:col-span-7">
+              <div className="lg:col-span-8 xl:col-span-8">
                 {selectedResult ? (
                   <DiffDetail result={selectedResult} />
                 ) : (

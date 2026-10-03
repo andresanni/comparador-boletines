@@ -31,57 +31,69 @@ export const DiffDetail: React.FC<DiffDetailProps> = ({ result }) => {
   };
 
   return (
-    <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 flex flex-col h-[700px] overflow-hidden">
+    <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 flex flex-col h-[calc(100vh-220px)] min-h-[580px] overflow-hidden shadow-xl">
       {/* Student Top Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-3 shrink-0">
-        <div>
-          <div className="flex items-center gap-3">
-            <h2 className="text-base font-bold text-slate-100">{result.studentName}</h2>
-            <span className="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-              DNI: {result.studentDni}
-            </span>
-            {result.grado && (
-              <span className="text-xs px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-medium">
-                {result.grado} {result.seccion}
+      <div className="pb-4 border-b border-slate-800 shrink-0 space-y-3">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="space-y-1.5 min-w-0">
+            <h2 className="text-xl font-bold tracking-tight text-white truncate" title={result.studentName}>
+              {result.studentName}
+            </h2>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700 font-medium">
+                DNI: {result.studentDni}
               </span>
-            )}
-            {result.ciclo && (
-              <span className="text-xs px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-medium">
-                {result.ciclo}
-              </span>
-            )}
-            {(result.manualData?.materias.length || result.appData?.materias.length) && (
-              <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-                {result.manualData?.materias.length || result.appData?.materias.length} materias
-              </span>
-            )}
+              {result.grado && (
+                <span className="text-xs px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 font-medium">
+                  {result.grado} {result.seccion}
+                </span>
+              )}
+              {result.ciclo && (
+                <span className="text-xs px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-300 border border-blue-500/20 font-medium">
+                  {result.ciclo}
+                </span>
+              )}
+              {(result.manualData?.materias.length || result.appData?.materias.length) && (
+                <span className="text-xs px-2 py-0.5 rounded-md bg-slate-800/80 text-slate-400 border border-slate-700">
+                  {result.manualData?.materias.length || result.appData?.materias.length} materias
+                </span>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-4 text-xs text-slate-400 mt-1">
-            <span>Manual: <strong className="text-slate-300">{result.manualFile}</strong></span>
-            <span>•</span>
-            <span>App: <strong className="text-slate-300">{result.appFile}</strong></span>
+
+          <div className="flex items-center gap-2.5 shrink-0 self-start md:self-center">
+            <label className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/90 border border-slate-700 text-xs font-medium text-slate-200 cursor-pointer hover:bg-slate-700/80 transition shadow-sm">
+              <Filter className="w-3.5 h-3.5 text-indigo-400" />
+              <input
+                type="checkbox"
+                checked={onlyDiffs}
+                onChange={(e) => setOnlyDiffs(e.target.checked)}
+                className="rounded border-slate-600 text-indigo-600 bg-slate-900 focus:ring-0"
+              />
+              <span>Ver sólo diferencias</span>
+            </label>
+            <button
+              onClick={exportStudentJson}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/90 border border-slate-700 text-xs font-medium text-slate-200 hover:bg-slate-700/80 transition shadow-sm"
+              title="Exportar auditoría a JSON"
+            >
+              <Download className="w-3.5 h-3.5 text-indigo-400" />
+              Exportar
+            </button>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <label className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-xs font-medium text-slate-300 cursor-pointer hover:bg-slate-700/80 transition">
-            <Filter className="w-3.5 h-3.5 text-indigo-400" />
-            <input
-              type="checkbox"
-              checked={onlyDiffs}
-              onChange={(e) => setOnlyDiffs(e.target.checked)}
-              className="rounded border-slate-700 text-indigo-600 bg-slate-900"
-            />
-            Ver sólo diferencias
-          </label>
-          <button
-            onClick={exportStudentJson}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-xs font-medium text-slate-300 hover:bg-slate-700/80 transition"
-            title="Exportar auditoría a JSON"
-          >
-            <Download className="w-3.5 h-3.5" />
-            Exportar
-          </button>
+        {/* File references bar */}
+        <div className="flex items-center gap-4 text-[11px] text-slate-400 bg-slate-950/40 px-3 py-1.5 rounded-lg border border-slate-800/60 flex-wrap">
+          <div className="flex items-center gap-1.5 truncate max-w-sm">
+            <span className="text-slate-500 font-mono text-[10px]">MANUAL:</span>
+            <span className="text-slate-300 truncate" title={result.manualFile}>{result.manualFile}</span>
+          </div>
+          <span className="text-slate-700 hidden sm:inline">•</span>
+          <div className="flex items-center gap-1.5 truncate max-w-sm">
+            <span className="text-slate-500 font-mono text-[10px]">APP:</span>
+            <span className="text-slate-300 truncate" title={result.appFile}>{result.appFile}</span>
+          </div>
         </div>
       </div>
 
@@ -116,35 +128,62 @@ export const DiffDetail: React.FC<DiffDetailProps> = ({ result }) => {
       <div className="flex-1 overflow-y-auto space-y-6 pr-2 custom-scrollbar">
         {/* If Only Diffs is active and there are diffs, show the summary list first */}
         {differences.length > 0 && (
-          <div className="space-y-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-rose-400 flex items-center gap-1.5">
-              <AlertTriangle className="w-3.5 h-3.5" />
-              Lista de Discrepancias ({differences.length})
-            </h3>
-            <div className="border border-slate-800 rounded-xl overflow-hidden divide-y divide-slate-800/80">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-rose-400 flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Lista de Discrepancias ({differences.length})
+              </h3>
+              <span className="text-[11px] text-slate-400">
+                Comparación directa de celdas
+              </span>
+            </div>
+
+            <div className="space-y-2.5">
               {differences.map((diff) => (
-                <div key={diff.id} className="p-3 bg-slate-950/40 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-slate-200">
-                      {diff.subject ? `${diff.subject} — ` : ''}
-                      {diff.item}
-                    </span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                <div
+                  key={diff.id}
+                  className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700/80 transition text-xs shadow-sm space-y-2.5"
+                >
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {diff.subject && (
+                        <span className="px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 font-semibold text-[11px]">
+                          {diff.subject}
+                        </span>
+                      )}
+                      {diff.bimestre && (
+                        <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono text-[10px] border border-slate-700/60">
+                          {diff.bimestre}° Bim.
+                        </span>
+                      )}
+                      <span className="font-medium text-slate-200">
+                        {diff.item}
+                      </span>
+                    </div>
+
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 shrink-0">
                       {diff.category}
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 mt-2">
-                    <div className="p-2 rounded bg-slate-900 border border-slate-800">
-                      <span className="text-[10px] text-slate-500 block uppercase font-mono">
-                        Manual (Original)
-                      </span>
-                      <span className="text-amber-300 font-medium">{diff.valueManual}</span>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div className="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800/80">
+                      <div className="flex items-center justify-between text-[10px] text-slate-400 uppercase font-mono mb-1">
+                        <span>Manual (Original)</span>
+                      </div>
+                      <div className="text-amber-300 font-mono font-medium text-xs break-words">
+                        {diff.valueManual}
+                      </div>
                     </div>
-                    <div className="p-2 rounded bg-rose-950/30 border border-rose-500/30">
-                      <span className="text-[10px] text-rose-400 block uppercase font-mono">
-                        App (Generado)
-                      </span>
-                      <span className="text-rose-300 font-semibold">{diff.valueApp}</span>
+                    <div className="p-2.5 rounded-lg bg-rose-950/20 border border-rose-500/30">
+                      <div className="flex items-center justify-between text-[10px] text-rose-400 uppercase font-mono mb-1">
+                        <span>App (Generado)</span>
+                        <span className="text-[10px] text-rose-400 font-semibold">Discrepancia</span>
+                      </div>
+                      <div className="text-rose-300 font-mono font-bold text-xs break-words">
+                        {diff.valueApp}
+                      </div>
                     </div>
                   </div>
                 </div>
