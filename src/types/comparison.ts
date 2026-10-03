@@ -53,8 +53,9 @@ export interface NormalizationConfig {
 export const DEFAULT_NORMALIZATION: NormalizationConfig = {
   normalizeDashes: true,
   ignoreCase: true,
-  zeroAsEmpty: false,
+  zeroAsEmpty: true,
   ignoreWhitespace: true,
   normalizeAccents: false,
   ignorePunctuation: false,
 };
+

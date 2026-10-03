@@ -6,7 +6,7 @@ interface DropZoneProps {
   appFiles: File[];
   onManualFilesSelected: (files: File[]) => void;
   onAppFilesSelected: (files: File[]) => void;
-  onLoadSamples: () => void;
+  onLoadSamples: (type: 'santina' | 'oriana') => void;
   onStartComparison: () => void;
   isProcessing: boolean;
   progressText: string;
@@ -58,20 +58,29 @@ export const DropZone: React.FC<DropZoneProps> = ({
           </div>
           <div>
             <p className="text-xs font-semibold text-indigo-200">
-              Prueba rápida con los boletines de muestra
+              Pruebas rápidas con boletines de muestra
             </p>
             <p className="text-[11px] text-indigo-300/70">
-              Carga los 2 boletines de prueba (Manual vs App) para probar el analizador al instante.
+              Prueba al instante con casos reales de 1er Ciclo y 2do Ciclo.
             </p>
           </div>
         </div>
-        <button
-          onClick={onLoadSamples}
-          disabled={isProcessing}
-          className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium rounded-lg shadow-sm transition whitespace-nowrap"
-        >
-          Cargar Muestras
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => onLoadSamples('santina')}
+            disabled={isProcessing}
+            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium rounded-lg shadow-sm transition whitespace-nowrap"
+          >
+            Muestra 4° (Santina)
+          </button>
+          <button
+            onClick={() => onLoadSamples('oriana')}
+            disabled={isProcessing}
+            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 disabled:opacity-50 text-indigo-300 text-xs font-medium rounded-lg shadow-sm transition whitespace-nowrap"
+          >
+            Muestra 1° (Oriana)
+          </button>
+        </div>
       </div>
 
       {/* Dual Dropzone */}

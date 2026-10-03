@@ -28,22 +28,20 @@ export function App() {
   const [isConfigOpen, setIsConfigOpen] = useState(false);
 
   // Quick Sample Loader
-  const handleLoadSamples = async () => {
+  const handleLoadSamples = async (sampleType: 'santina' | 'oriana' = 'santina') => {
     setIsProcessing(true);
-    setProgressText('Cargando boletines de prueba...');
+    setProgressText(`Cargando boletines de prueba (${sampleType === 'oriana' ? '1° Grado - Oriana' : '4° Grado - Santina'})...`);
     try {
-      const [resMan, resApp] = await Promise.all([
-        fetch('/samples/boletin_manual.pdf'),
-        fetch('/samples/boletin_app.pdf'),
-      ]);
+      const manUrl = sampleType === 'oriana' ? '/samples/boletin_manual_oriana.pdf' : '/samples/boletin_manual.pdf';
+      const appUrl = sampleType === 'oriana' ? '/samples/boletin_app_oriana.pdf' : '/samples/boletin_app.pdf';
+      const manName = sampleType === 'oriana' ? 'boletin_manual_oriana.pdf' : 'boletin_manual_santina.pdf';
+      const appName = sampleType === 'oriana' ? 'boletin_app_oriana.pdf' : 'boletin_app_santina.pdf';
 
-      const [bufMan, bufApp] = await Promise.all([
-        resMan.arrayBuffer(),
-        resApp.arrayBuffer(),
-      ]);
+      const [resMan, resApp] = await Promise.all([fetch(manUrl), fetch(appUrl)]);
+      const [bufMan, bufApp] = await Promise.all([resMan.arrayBuffer(), resApp.arrayBuffer()]);
 
-      const fileMan = new File([bufMan], 'boletin_manual_santina.pdf', { type: 'application/pdf' });
-      const fileApp = new File([bufApp], 'boletin_app_santina.pdf', { type: 'application/pdf' });
+      const fileMan = new File([bufMan], manName, { type: 'application/pdf' });
+      const fileApp = new File([bufApp], appName, { type: 'application/pdf' });
 
       setManualFiles([fileMan]);
       setAppFiles([fileApp]);
@@ -71,6 +69,7 @@ export function App() {
       setProgressText('');
     }
   };
+
 
   // Full Batch Processing
   const handleStartComparison = async () => {

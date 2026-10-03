@@ -1,12 +1,12 @@
 import type { NormalizationConfig } from '../types/comparison';
 
-
 export function cleanText(str: string | null | undefined): string {
   if (!str) return '';
   return str
-    .replace(/fi\s+/g, 'fi')
-    .replace(/fl\s+/g, 'fl')
-    .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015]/g, '-')
+    .replace(/\b(\w+)\s+(fi\w*)\b/gi, '$1$2')
+    .replace(/fi\s*/g, 'fi')
+    .replace(/fl\s*/g, 'fl')
+    .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015_]/g, '-')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -22,9 +22,14 @@ export function normalizeValue(
     s = s.replace(/\s+/g, ' ').trim();
   }
 
+  // Canonicalize "NO CORRESPONDE A LA PLANIFICACIÓN DEL BIMESTRE"
+  if (/CORRESPONDE\s+A\s+LA\s+PLANIFICACI[ÓO]N/i.test(s)) {
+    return 'NO CORRESPONDE A LA PLANIFICACIÓN DEL BIMESTRE';
+  }
+
   // Dashes / Empty indicators
   if (config.normalizeDashes) {
-    if (s === '---' || s === '--' || s === '-' || s === '—' || s === '- - -') {
+    if (s === '---' || s === '--' || s === '-' || s === '—' || s === '- - -' || s === '_') {
       return '';
     }
   }

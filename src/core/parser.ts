@@ -1,7 +1,13 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
-import type { BoletinData, StudentInfo, DispositivosApoyo, AsistenciaBimestre, CierreAnual } from '../types/boletin';
-
+import type {
+  BoletinData,
+  StudentInfo,
+  DispositivosApoyo,
+  AsistenciaBimestre,
+  CierreAnual,
+  MateriaCalificacion,
+} from '../types/boletin';
 import { cleanText } from './normalizer';
 
 // Set up the PDF worker for Vite
@@ -18,7 +24,7 @@ function getCol(x: number): number {
   if (x >= 405 && x < 460) return 1; // 2° Bimestre
   if (x >= 460 && x < 515) return 2; // 3° Bimestre
   if (x >= 515) return 3;            // 4° Bimestre
-  return -1; // Label / Description column (x < 335)
+  return -1;                         // Label / Description column (x < 335)
 }
 
 async function getPageItems(page: any): Promise<TextItemObj[]> {
@@ -32,24 +38,44 @@ async function getPageItems(page: any): Promise<TextItemObj[]> {
     }));
 }
 
-function groupLines(items: TextItemObj[]): TextItemObj[][] {
-  const sorted = [...items].sort((a, b) => b.y - a.y || a.x - b.x);
-  const lines: TextItemObj[][] = [];
-  let curY: number | null = null;
-  let curLine: TextItemObj[] = [];
+function groupCriteriaLabels(items: TextItemObj[]): TextItemObj[][] {
+  const sorted = [...items].sort((a, b) => b.y - a.y);
+  const criteria: TextItemObj[][] = [];
+  let cur: TextItemObj[] = [];
 
   for (const it of sorted) {
-    if (curY === null || Math.abs(curY - it.y) <= 4) {
-      curLine.push(it);
-      if (curY === null) curY = it.y;
+    if (cur.length === 0) {
+      cur.push(it);
     } else {
-      lines.push(curLine);
-      curLine = [it];
-      curY = it.y;
+      const lastY = cur[cur.length - 1].y;
+      if (lastY - it.y <= 16) {
+        cur.push(it);
+      } else {
+        criteria.push(cur);
+        cur = [it];
+      }
     }
   }
-  if (curLine.length > 0) lines.push(curLine);
-  return lines;
+  if (cur.length > 0) criteria.push(cur);
+  return criteria;
+}
+
+// Fix multi-line "NO CORRESPONDE A LA PLANIFICACIÓN DEL BIMESTRE" bleed
+function fixNoCorrespondeBleed(rows: { label: string; bimestres: [string, string, string, string] }[]) {
+  for (let i = 0; i < rows.length; i++) {
+    for (let c = 0; c < 4; c++) {
+      const val = rows[i].bimestres[c];
+      // If row i ends with "NO" and row i+1 starts with "CORRESPONDE"
+      if (i + 1 < rows.length && /\bNO$/i.test(val) && /^CORRESPONDE/i.test(rows[i + 1].bimestres[c])) {
+        rows[i].bimestres[c] = val.replace(/\s*NO$/i, '').trim();
+        rows[i + 1].bimestres[c] = ('NO ' + rows[i + 1].bimestres[c]).trim();
+      }
+      // Canonical wording
+      if (/CORRESPONDE\s+A\s+LA\s+PLANIFICACI[ÓO]N/i.test(rows[i].bimestres[c])) {
+        rows[i].bimestres[c] = 'NO CORRESPONDE A LA PLANIFICACIÓN DEL BIMESTRE';
+      }
+    }
+  }
 }
 
 export async function parseBoletinPDF(
@@ -78,7 +104,7 @@ export async function parseBoletinPDF(
     cuales: '',
   };
 
-  const materias: BoletinData['materias'] = [];
+  const materias: MateriaCalificacion[] = [];
   const asistencias: AsistenciaBimestre[] = [];
   const cierre: CierreAnual = {
     sintesisConceptual: '',
@@ -89,225 +115,241 @@ export async function parseBoletinPDF(
   // --- PAGE 1: Portada ---
   if (numPages >= 1) {
     const p1Items = await getPageItems(await doc.getPage(1));
-    const p1Lines = groupLines(p1Items);
 
-    // Alumno
+    // Alumno (gather all items in name box on same line, handling split ligatures like So + fia)
     const alumnoLabel = p1Items.find(
       (i) => i.str.toLowerCase().includes('alumno/a') || i.str.toLowerCase().includes('alumno:')
     );
     if (alumnoLabel) {
-      const nameItem = p1Items.find(
-        (i) => Math.abs(i.y - alumnoLabel.y) <= 6 && !i.str.toLowerCase().includes('alumno')
-      );
-      if (nameItem) {
-        estudiante.alumno = cleanText(nameItem.str);
-      } else {
-        const m = alumnoLabel.str.match(/Alumno(?:\/a)?:\s*(.+)/i);
-        if (m) estudiante.alumno = cleanText(m[1]);
+      const nameItems = p1Items
+        .filter((i) => Math.abs(i.y - alumnoLabel.y) <= 8 && i.x > 150 && !i.str.toLowerCase().includes('alumno'))
+        .sort((a, b) => a.x - b.x);
+      if (nameItems.length > 0) {
+        estudiante.alumno = cleanText(nameItems.map((i) => i.str).join(' '));
       }
     }
 
-    for (let idx = 0; idx < p1Lines.length; idx++) {
-      const lineStr = p1Lines[idx].map((i) => i.str).join(' ');
-
-      // DNI
-      if (lineStr.toLowerCase().includes('dni')) {
-        const m = lineStr.match(/\b\d{7,9}\b/);
-        if (m) estudiante.dni = m[0];
+    // DNI
+    const dniLabel = p1Items.find((i) => i.str.toUpperCase() === 'DNI');
+    if (dniLabel) {
+      const dniItems = p1Items.filter((i) => Math.abs(i.y - dniLabel.y) <= 8 && i.x > 150);
+      if (dniItems.length > 0) {
+        estudiante.dni = dniItems[0].str.replace(/\D/g, '');
       }
+    }
 
-      // GRADO, SECCION, TURNO, JORNADA
-      if (lineStr.includes('GRADO') && lineStr.includes('SECCIÓN')) {
-        if (idx + 1 < p1Lines.length) {
-          const valLine = p1Lines[idx + 1].map((i) => i.str);
-          if (valLine.length >= 4) {
-            estudiante.grado = valLine[0];
-            estudiante.seccion = valLine[1];
-            estudiante.turno = valLine[2];
-            estudiante.jornada = valLine[3];
+    // Grado, Sección, Turno, Jornada
+    const gItems = p1Items.filter((i) => i.y <= 270 && i.y >= 245).sort((a, b) => a.x - b.x);
+    if (gItems.length >= 4) {
+      estudiante.grado = gItems[0].str;
+      estudiante.seccion = gItems[1].str;
+      estudiante.turno = gItems[2].str;
+      estudiante.jornada = gItems[3].str;
+    }
+
+    // Responsable
+    const respItems = p1Items.filter((i) => i.y <= 190 && i.y >= 165).sort((a, b) => a.x - b.x);
+    if (respItems.length > 0) {
+      estudiante.responsable = cleanText(respItems.map((i) => i.str).join(' '));
+    }
+  }
+
+  // --- Dynamic Multi-Page Processing ---
+  let p3Parsed = false;
+
+  for (let pNum = 3; pNum <= numPages; pNum++) {
+    const page = await doc.getPage(pNum);
+    const items = (await getPageItems(page)).filter((i) => i.y > 70 && i.y < 795);
+    const pageText = items.map((i) => i.str).join(' ');
+
+    // 1. Page 3: Trabajo en el Aula + Convivencia + Apoyos
+    if (!p3Parsed && (pageText.includes('TRABAJO EN EL AULA') || pageText.includes('dispositivos de apoyo'))) {
+      p3Parsed = true;
+
+      const mProm = pageText.match(/¿Promocionó con acompañamiento\?\s*([^¿]+)/i);
+      if (mProm) apoyos.promocionoConAcompañamiento = cleanText(mProm[1]);
+      const mPosee = pageText.match(/¿Posee apoyos\s*\/\s*acompañamiento\?\s*([^\s¿]+)/i);
+      if (mPosee) apoyos.poseeApoyos = cleanText(mPosee[1]);
+      const mCuales = pageText.match(/¿Cuáles\?\s*([^\s]+)/i);
+      if (mCuales) apoyos.cuales = cleanText(mCuales[1]);
+
+      const tAulaHeader = items.find((i) => i.x < 335 && i.str.toUpperCase().includes('TRABAJO'));
+      const convHeader = items.find((i) => i.x < 335 && i.str.toUpperCase().includes('CONVIVENCIA'));
+
+      if (tAulaHeader && convHeader) {
+        const tAulaItems = items.filter((i) => i.x < 335 && i.y < tAulaHeader.y - 5 && i.y > convHeader.y + 5);
+        const convItems = items.filter((i) => i.x < 335 && i.y < convHeader.y - 5 && i.y > 115);
+
+        const critsAula = groupCriteriaLabels(tAulaItems);
+        const critsConv = groupCriteriaLabels(convItems);
+
+        const extract5Rows = (crits: TextItemObj[][], topLimit: number, bottomLimit: number) => {
+          const anchors = crits.slice(0, 5).map((c) => ({
+            label: cleanText(c.map((x) => x.str).join(' ')),
+            topY: c[0].y,
+            bottomY: c[c.length - 1].y,
+          }));
+
+          const colItems = items
+            .filter((i) => i.x >= 335 && i.y <= topLimit && i.y >= bottomLimit)
+            .filter(
+              (i) =>
+                !i.str.toLowerCase().includes('bimestre') &&
+                !i.str.toLowerCase().includes('cuatrimestre') &&
+                !i.str.toLowerCase().includes('primer') &&
+                !i.str.toLowerCase().includes('segundo') &&
+                !i.str.toLowerCase().includes('tercer') &&
+                !i.str.toLowerCase().includes('cuarto')
+            );
+
+          const bounds: { upper: number; lower: number }[] = [];
+          for (let k = 0; k < anchors.length; k++) {
+
+            const upper = k === 0 ? topLimit : (anchors[k - 1].bottomY + anchors[k].topY) / 2;
+            const lower =
+              k === anchors.length - 1 ? bottomLimit : (anchors[k].bottomY + anchors[k + 1].topY) / 2;
+            bounds.push({ upper, lower });
           }
-        }
-      }
 
-      // Responsable
-      if (lineStr.toLowerCase().includes('responsable') && !lineStr.toLowerCase().includes('firma')) {
-        if (idx + 1 < p1Lines.length) {
-          estudiante.responsable = cleanText(p1Lines[idx + 1].map((i) => i.str).join(' '));
-        }
-      }
+          const extracted: { label: string; bimestres: [string, string, string, string] }[] = anchors.map(
+            (a, k) => {
+              const b = bounds[k];
+              const rItems = colItems.filter((i) => i.y <= b.upper && i.y > b.lower);
+              const bimestres: [string, string, string, string] = ['', '', '', ''];
+              for (let c = 0; c < 4; c++) {
+                const cItems = rItems
+                  .filter((i) => getCol(i.x) === c)
+                  .sort((x, y) => y.y - x.y)
+                  .map((i) => i.str)
+                  .join(' ');
+                bimestres[c] = cleanText(cItems);
+              }
+              return { label: a.label, bimestres };
+            }
+          );
 
-      // Año
-      const mYear = lineStr.match(/Año\s+(\d{4})/i);
-      if (mYear) estudiante.año = mYear[1];
+          fixNoCorrespondeBleed(extracted);
+          return extracted;
+        };
+
+        materias.push({
+          nombre: 'TRABAJO EN EL AULA',
+          ppi: '',
+          criterios: extract5Rows(critsAula, tAulaHeader.y - 5, convHeader.y + 10),
+          calificacionGeneral: null,
+        });
+
+        materias.push({
+          nombre: 'CONVIVENCIA',
+          ppi: '',
+          criterios: extract5Rows(critsConv, convHeader.y - 5, 120),
+          calificacionGeneral: null,
+        });
+      }
+      continue;
     }
-  }
 
-  // --- PAGE 3: Apoyos header ---
-  if (numPages >= 3) {
-    const p3Items = await getPageItems(await doc.getPage(3));
-    const p3TopItems = p3Items.filter((i) => i.y > 670);
-    const p3TopText = p3TopItems.map((i) => i.str).join(' ');
-
-    const mProm = p3TopText.match(/¿Promocionó con acompañamiento\?\s*([^¿]+)/i);
-    if (mProm) apoyos.promocionoConAcompañamiento = cleanText(mProm[1]);
-
-    const mPosee = p3TopText.match(/¿Posee apoyos\s*\/\s*acompañamiento\?\s*([^\s¿]+)/i);
-    if (mPosee) apoyos.poseeApoyos = cleanText(mPosee[1]);
-
-    const mCuales = p3TopText.match(/¿Cuáles\?\s*([^\s]+)/i);
-    if (mCuales) apoyos.cuales = cleanText(mCuales[1]);
-  }
-
-  // --- PAGES 3 to 8: Tables ---
-  const subjectConfigs = [
-    { page: 3, name: 'TRABAJO EN EL AULA' },
-    { page: 3, name: 'CONVIVENCIA' },
-    { page: 4, name: 'LENGUA' },
-    { page: 4, name: 'MATEMÁTICA' },
-    { page: 5, name: 'CIENCIAS SOCIALES' },
-    { page: 5, name: 'CIENCIAS NATURALES' },
-    { page: 6, name: 'TECNOLOGÍA, DISEÑO Y PROGRAMACIÓN' },
-    { page: 6, name: 'EDUCACIÓN ARTÍSTICA - ARTES VISUALES' },
-    { page: 7, name: 'EDUCACIÓN ARTÍSTICA - MÚSICA' },
-    { page: 7, name: 'LENGUAS ADICIONALES - INGLÉS' },
-    { page: 8, name: 'EDUCACIÓN FÍSICA' },
-  ];
-
-  for (let p = 3; p <= Math.min(numPages, 8); p++) {
-    const pageItems = await getPageItems(await doc.getPage(p));
-    const contentItems = pageItems.filter((i) => i.y <= 790 && i.y >= 90);
-
-    // Row markers in Col 1 (Segundo Bimestre)
-    const col1Marks = contentItems
-      .filter((i) => getCol(i.x) === 1 && i.str !== 'Bimestre')
+    // 2. Curricular Subjects (identified by presence of PPI and CALIFICACIÓN GENERAL)
+    const ppis = items.filter((i) => i.x < 335 && i.str.toUpperCase() === 'PPI').sort((a, b) => b.y - a.y);
+    const gens = items
+      .filter((i) => i.x < 335 && i.str.toUpperCase().includes('CALIFICACIÓN GENERAL') && i.y > 115)
       .sort((a, b) => b.y - a.y);
 
-    const rows: { label: string; bimestres: [string, string, string, string] }[] = [];
+    if (ppis.length > 0 && gens.length > 0) {
+      for (let t = 0; t < ppis.length; t++) {
+        const ppiItem = ppis[t];
+        const genItem = gens[t];
+        if (!genItem) continue;
 
-    for (let r = 0; r < col1Marks.length; r++) {
-      const mark = col1Marks[r];
-      const prevMark = col1Marks[r - 1];
-      const nextMark = col1Marks[r + 1];
+        const ppiY = ppiItem.y;
+        const genY = genItem.y;
 
-      const yMax = prevMark ? (mark.y + prevMark.y) / 2 : mark.y + 25;
-      const yMin = nextMark ? (mark.y + nextMark.y) / 2 : mark.y - 25;
+        // Subject Title: text immediately above PPI
+        const titleItems = items
+          .filter(
+            (i) =>
+              i.x < 335 &&
+              i.y > ppiY &&
+              i.y <= ppiY + 55 &&
+              !i.str.includes('Ciclo') &&
+              !i.str.includes('Grado') &&
+              !i.str.toUpperCase().includes('CUATRIMESTRE')
+          )
+          .sort((a, b) => b.y - a.y);
+        const title = cleanText(titleItems.map((i) => i.str).join(' '));
 
-      const rowItems = contentItems.filter((i) => i.y <= yMax && i.y > yMin);
+        // Exactly 5 criteria
+        const between = items.filter((i) => i.x < 335 && i.y < ppiY - 5 && i.y > genY + 5);
+        const crits = groupCriteriaLabels(between).slice(0, 5);
 
-      const label = cleanText(
-        rowItems
-          .filter((i) => getCol(i.x) === -1)
-          .sort((a, b) => b.y - a.y || a.x - b.x)
-          .map((i) => i.str)
-          .join(' ')
-      );
+        // 7 Row Anchors: PPI (0), 5 Criteria (1..5), Calificación General (6)
+        const rowAnchors = [
+          { type: 'ppi', label: 'PPI', topY: ppiY + 6, bottomY: ppiY - 6 },
+          ...crits.map((c) => ({
+            type: 'criterio',
+            label: cleanText(c.map((x) => x.str).join(' ')),
+            topY: c[0].y,
+            bottomY: c[c.length - 1].y,
+          })),
+          { type: 'gen', label: 'CALIFICACIÓN GENERAL', topY: genY + 6, bottomY: genY - 6 },
+        ];
 
-      const bimestres: [string, string, string, string] = ['', '', '', ''];
-      for (let c = 0; c < 4; c++) {
-        const cItems = rowItems
-          .filter((i) => getCol(i.x) === c)
-          .sort((a, b) => b.y - a.y || a.x - b.x)
-          .map((i) => i.str)
-          .join(' ');
-        bimestres[c] = cleanText(cItems);
-      }
+        const rowBounds: { upper: number; lower: number }[] = [];
+        for (let k = 0; k < rowAnchors.length; k++) {
 
-      rows.push({ label, bimestres });
-    }
+          const upper = k === 0 ? ppiY + 15 : (rowAnchors[k - 1].bottomY + rowAnchors[k].topY) / 2;
+          const lower = k === rowAnchors.length - 1 ? genY - 15 : (rowAnchors[k].bottomY + rowAnchors[k + 1].topY) / 2;
+          rowBounds.push({ upper, lower });
+        }
 
-    if (p === 3) {
-      const convIdx = rows.findIndex((r) => r.label.includes('CONVIVENCIA'));
-      const tAulaRows = convIdx !== -1 ? rows.slice(0, convIdx) : rows.slice(0, 6);
-      const convRows = convIdx !== -1 ? rows.slice(convIdx) : rows.slice(6);
+        const colItems = items
+          .filter((i) => i.x >= 335 && i.y <= ppiY + 15 && i.y >= genY - 15)
+          .filter(
+            (i) =>
+              !i.str.toLowerCase().includes('bimestre') &&
+              !i.str.toLowerCase().includes('cuatrimestre') &&
+              !i.str.toLowerCase().includes('primer') &&
+              !i.str.toLowerCase().includes('segundo') &&
+              !i.str.toLowerCase().includes('tercer') &&
+              !i.str.toLowerCase().includes('cuarto')
+          );
 
-      materias.push({
-        nombre: 'TRABAJO EN EL AULA',
-        ppi: '',
-        criterios: tAulaRows.filter((r) => !r.label.includes('TRABAJO EN EL AULA')),
-        calificacionGeneral: null,
-      });
-
-      materias.push({
-        nombre: 'CONVIVENCIA',
-        ppi: '',
-        criterios: convRows.filter((r) => !r.label.includes('CONVIVENCIA')),
-        calificacionGeneral: null,
-      });
-    } else if (p >= 4 && p <= 7) {
-      const califGenIndices: number[] = [];
-      rows.forEach((r, idx) => {
-        if (r.label.includes('CALIFICACIÓN GENERAL')) califGenIndices.push(idx);
-      });
-
-      const names = subjectConfigs.filter((s) => s.page === p).map((s) => s.name);
-
-      if (califGenIndices.length >= 2) {
-        // Table 1
-        const t1Rows = rows.slice(0, califGenIndices[0] + 1);
-        const ppi1 = t1Rows.find((r) => r.label === 'PPI' || r.label.startsWith('PPI'));
-        const gen1 = t1Rows.find((r) => r.label.includes('CALIFICACIÓN GENERAL'));
-        const crit1 = t1Rows.filter(
-          (r) =>
-            !r.label.includes('Ciclo') &&
-            !r.label.includes(names[0]) &&
-            !r.label.startsWith('PPI') &&
-            !r.label.includes('CALIFICACIÓN GENERAL')
-        );
-
-        materias.push({
-          nombre: names[0],
-          ppi: ppi1 ? ppi1.bimestres[0] : '',
-          criterios: crit1,
-          calificacionGeneral: gen1 ? gen1.bimestres : ['', '', '', ''],
+        const rows = rowAnchors.map((anchor, k) => {
+          const b = rowBounds[k];
+          const rItems = colItems.filter((i) => i.y <= b.upper && i.y > b.lower);
+          const bimestres: [string, string, string, string] = ['', '', '', ''];
+          for (let c = 0; c < 4; c++) {
+            const cItems = rItems
+              .filter((i) => getCol(i.x) === c)
+              .sort((x, y) => y.y - x.y)
+              .map((i) => i.str)
+              .join(' ');
+            bimestres[c] = cleanText(cItems);
+          }
+          return { type: anchor.type, label: anchor.label, bimestres };
         });
 
-        // Table 2
-        const t2Rows = rows.slice(califGenIndices[0] + 1);
-        const ppi2 = t2Rows.find((r) => r.label === 'PPI' || r.label.startsWith('PPI'));
-        const gen2 = t2Rows.find((r) => r.label.includes('CALIFICACIÓN GENERAL'));
-        const crit2 = t2Rows.filter(
-          (r) =>
-            !r.label.includes('Ciclo') &&
-            !r.label.includes(names[1]) &&
-            !r.label.startsWith('PPI') &&
-            !r.label.includes('CALIFICACIÓN GENERAL')
-        );
+        // Bleed correction for multi-line evaluation phrases
+        fixNoCorrespondeBleed(rows);
+
+        const ppiRow = rows.find((r) => r.type === 'ppi');
+        const genRow = rows.find((r) => r.type === 'gen');
+        const critRows = rows.filter((r) => r.type === 'criterio');
 
         materias.push({
-          nombre: names[1],
-          ppi: ppi2 ? ppi2.bimestres[0] : '',
-          criterios: crit2,
-          calificacionGeneral: gen2 ? gen2.bimestres : ['', '', '', ''],
+          nombre: title,
+          ppi: ppiRow ? ppiRow.bimestres[0] : '',
+          criterios: critRows.map((r) => ({ label: r.label, bimestres: r.bimestres })),
+          calificacionGeneral: genRow ? genRow.bimestres : ['', '', '', ''],
         });
       }
-    } else if (p === 8) {
-      // 1 subject: Educación Física
-      const ppi = rows.find((r) => r.label === 'PPI' || r.label.startsWith('PPI'));
-      const gen = rows.find((r) => r.label.includes('CALIFICACIÓN GENERAL'));
-      const crit = rows.filter(
-        (r) =>
-          !r.label.includes('Ciclo') &&
-          !r.label.includes('EDUCACIÓN FÍSICA') &&
-          !r.label.startsWith('PPI') &&
-          !r.label.includes('CALIFICACIÓN GENERAL')
-      );
-
-      materias.push({
-        nombre: 'EDUCACIÓN FÍSICA',
-        ppi: ppi ? ppi.bimestres[0] : '',
-        criterios: crit,
-        calificacionGeneral: gen ? gen.bimestres : ['', '', '', ''],
-      });
+      continue;
     }
-  }
 
-  // --- PAGES 9 to 12: Asistencia ---
-  for (let bim = 1; bim <= 4; bim++) {
-    const pNum = 8 + bim;
-    if (numPages >= pNum) {
-      const pageItems = await getPageItems(await doc.getPage(pNum));
-      const fullText = pageItems.map((i) => i.str).join(' ');
-
+    // 3. Asistencia Pages (1° a 4° Bimestre)
+    const mBimMatch = pageText.match(/([1234])°?\s*BIMESTRE.*Control de asistencia/i);
+    if (mBimMatch) {
+      const bim = parseInt(mBimMatch[1], 10);
       const asis: AsistenciaBimestre = {
         bimestre: bim,
         asistencias: '',
@@ -316,36 +358,37 @@ export async function parseBoletinPDF(
         observaciones: '',
       };
 
-      const mAsis = fullText.match(/Asistencias\s+([^\s]+)/i);
+      const mAsis = pageText.match(/Asistencias\s+([^\s]+)/i);
       if (mAsis) asis.asistencias = cleanText(mAsis[1]);
 
-      const mInasis = fullText.match(/Inasistencias\s+([^\s]+)/i);
+      const mInasis = pageText.match(/Inasistencias\s+([^\s]+)/i);
       if (mInasis) asis.inasistencias = cleanText(mInasis[1]);
 
-      const mTarde = fullText.match(/Llegadas tarde\s+([^\s]+)/i);
+      const mTarde = pageText.match(/Llegadas tarde\s+([^\s]+)/i);
       if (mTarde) asis.llegadasTarde = cleanText(mTarde[1]);
 
-      const mObs = fullText.match(/Observaciones\s+([^Firma]+)/i);
+      const mObs = pageText.match(/Observaciones\s+([^Firma]+)/i);
       if (mObs) asis.observaciones = cleanText(mObs[1]);
 
       asistencias.push(asis);
+      continue;
+    }
+
+    // 4. Cierre Anual (Síntesis Conceptual)
+    if (pageText.includes('Síntesis Conceptual') || pageText.includes('Promovido/a a')) {
+      const mSint = pageText.match(/Síntesis Conceptual\s*([^Permanece]+)/i);
+      if (mSint) cierre.sintesisConceptual = cleanText(mSint[1]);
+
+      const mPerm = pageText.match(/Permanece en\s*([^Promovido]+)/i);
+      if (mPerm) cierre.permaneceEn = cleanText(mPerm[1]);
+
+      const mProm = pageText.match(/Promovido\/a a:\s*([^FIRMA]+)/i);
+      if (mProm) cierre.promovidoA = cleanText(mProm[1]);
+      continue;
     }
   }
 
-  // --- PAGE 13: Cierre ---
-  if (numPages >= 13) {
-    const p13Items = await getPageItems(await doc.getPage(13));
-    const full13 = p13Items.map((i) => i.str).join(' ');
-
-    const mSint = full13.match(/Síntesis Conceptual\s*([^Permanece]+)/i);
-    if (mSint) cierre.sintesisConceptual = cleanText(mSint[1]);
-
-    const mPerm = full13.match(/Permanece en\s*([^Promovido]+)/i);
-    if (mPerm) cierre.permaneceEn = cleanText(mPerm[1]);
-
-    const mPromovido = full13.match(/Promovido\/a a:\s*([^FIRMA]+)/i);
-    if (mPromovido) cierre.promovidoA = cleanText(mPromovido[1]);
-  }
+  asistencias.sort((a, b) => a.bimestre - b.bimestre);
 
   return {
     fileName,
