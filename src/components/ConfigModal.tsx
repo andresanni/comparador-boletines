@@ -129,6 +129,23 @@ export const ConfigModal: React.FC<ConfigModalProps> = ({
               </p>
             </div>
           </label>
+
+          <label className="flex items-start gap-3 cursor-pointer group">
+            <input
+              type="checkbox"
+              checked={config.flexibleStudentNames}
+              onChange={() => toggle('flexibleStudentNames')}
+              className="mt-1 h-4 w-4 rounded border-slate-700 text-indigo-600 focus:ring-indigo-500 bg-slate-800"
+            />
+            <div>
+              <span className="text-sm font-medium text-slate-200 group-hover:text-indigo-400 transition">
+                Tolerancia en formato de nombres
+              </span>
+              <p className="text-xs text-slate-400">
+                Ignora diferencias cosméticas en el nombre (<code className="text-indigo-300">Apellido,Nombre</code> vs <code className="text-indigo-300">Apellido, Nombre</code>, tildes, comas o segundo nombre omitido).
+              </p>
+            </div>
+          </label>
         </div>
 
         <div className="pt-4 border-t border-slate-800 flex justify-end">

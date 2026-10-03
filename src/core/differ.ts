@@ -6,7 +6,7 @@ import type {
 } from '../types/comparison';
 import { DEFAULT_NORMALIZATION } from '../types/comparison';
 
-import { areEquivalent } from './normalizer';
+import { areEquivalent, areNamesEquivalent } from './normalizer';
 
 export function compareBoletines(
   manual: BoletinData,
@@ -45,7 +45,17 @@ export function compareBoletines(
     addDiff('Estudiante', 'DNI', manual.estudiante.dni, app.estudiante.dni);
   }
   if (manual.estudiante.alumno && app.estudiante.alumno) {
-    addDiff('Estudiante', 'Nombre del Alumno/a', manual.estudiante.alumno, app.estudiante.alumno);
+    if (!areNamesEquivalent(manual.estudiante.alumno, app.estudiante.alumno, config)) {
+      addDiff(
+        'Estudiante',
+        'Nombre del Alumno/a',
+        manual.estudiante.alumno,
+        app.estudiante.alumno,
+        undefined,
+        undefined,
+        'warning'
+      );
+    }
   }
   if (manual.estudiante.grado && app.estudiante.grado) {
     addDiff('Estudiante', 'Grado', manual.estudiante.grado, app.estudiante.grado);

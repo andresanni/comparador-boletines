@@ -49,6 +49,7 @@ export interface NormalizationConfig {
   ignoreWhitespace: boolean;     // Colapsar espacios múltiples y saltos de línea
   normalizeAccents: boolean;     // Ignorar tildes si es necesario en observaciones
   ignorePunctuation: boolean;    // Ignorar puntos finales en observaciones
+  flexibleStudentNames: boolean; // Tolerar comas, espacios y formato en nombres de alumnos
 }
 
 export const DEFAULT_NORMALIZATION: NormalizationConfig = {
@@ -58,5 +59,6 @@ export const DEFAULT_NORMALIZATION: NormalizationConfig = {
   ignoreWhitespace: true,
   normalizeAccents: false,
   ignorePunctuation: false,
+  flexibleStudentNames: true,
 };
 

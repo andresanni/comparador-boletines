@@ -9,8 +9,44 @@ function cleanText(str) {
     .replace(/fi\s*/g, 'fi')
     .replace(/fl\s*/g, 'fl')
     .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015_]/g, '-')
+    .replace(/\s*,\s*/g, ', ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function normalizeStudentName(name) {
+  if (!name) return '';
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s*,\s*/g, ' ')
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function areNamesEquivalent(nameA, nameB, flexible = true) {
+  if (!nameA && !nameB) return true;
+  if (!nameA || !nameB) return false;
+  if (nameA.trim() === nameB.trim()) return true;
+
+  if (flexible) {
+    const normA = normalizeStudentName(nameA);
+    const normB = normalizeStudentName(nameB);
+    if (normA === normB) return true;
+
+    const wordsA = normA.split(' ').filter(Boolean).sort();
+    const wordsB = normB.split(' ').filter(Boolean).sort();
+    if (wordsA.length === wordsB.length && wordsA.every((w, i) => w === wordsB[i])) return true;
+
+    if (wordsA.length >= 2 && wordsB.length >= 2) {
+      const isASubsetOfB = wordsA.every((w) => wordsB.includes(w));
+      const isBSubsetOfA = wordsB.every((w) => wordsA.includes(w));
+      if (isASubsetOfB || isBSubsetOfA) return true;
+    }
+  }
+  return false;
 }
 
 function normalizeValue(val, options = { zeroAsEmpty: true }) {
@@ -328,7 +364,16 @@ function compare(manual, app) {
   }
 
   check('Estudiante', 'DNI', manual.estudiante.dni, app.estudiante.dni);
-  check('Estudiante', 'Alumno', manual.estudiante.alumno, app.estudiante.alumno);
+  if (manual.estudiante.alumno && app.estudiante.alumno) {
+    if (!areNamesEquivalent(manual.estudiante.alumno, app.estudiante.alumno)) {
+      diffs.push({
+        category: 'Estudiante',
+        item: 'Alumno',
+        manual: manual.estudiante.alumno,
+        app: app.estudiante.alumno,
+      });
+    }
+  }
 
   for (const mMan of manual.materias) {
     const norm = mMan.nombre.replace(/[-/]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
