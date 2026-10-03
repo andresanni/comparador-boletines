@@ -365,11 +365,120 @@ function compare(manual, app) {
   return diffs;
 }
 
+function findPdfFiles(dir) {
+  let results = [];
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      results = results.concat(findPdfFiles(fullPath));
+    } else if (entry.name.toLowerCase().endsWith('.pdf')) {
+      results.push(fullPath);
+    }
+  }
+  return results;
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const fileMan = args[0] || 'samples/boletin_manual_oriana.pdf';
   const fileApp = args[1] || 'samples/boletin_app_oriana.pdf';
 
+  if (!fs.existsSync(fileMan) || !fs.existsSync(fileApp)) {
+    console.error(`Error: No se encontró uno de los archivos o directorios:\n  Manual: ${fileMan}\n  App: ${fileApp}`);
+    process.exit(1);
+  }
+
+  const isDirMan = fs.statSync(fileMan).isDirectory();
+  const isDirApp = fs.statSync(fileApp).isDirectory();
+
+  if (isDirMan && isDirApp) {
+    console.log(`\n======================================================`);
+    console.log(` AUDITOR DE BOLETINES (CLI) - COMPARACIÓN POR LOTE`);
+    console.log(` Manual: ${fileMan}`);
+    console.log(` App:    ${fileApp}`);
+    console.log(`======================================================\n`);
+
+    const pdfsMan = findPdfFiles(fileMan);
+    const pdfsApp = findPdfFiles(fileApp);
+
+    console.log(`Archivos detectados: ${pdfsMan.length} manuales, ${pdfsApp.length} generados por app.\n`);
+
+    console.log(`Leyendo boletines manuales...`);
+    const parsedMan = [];
+    for (const p of pdfsMan) {
+      parsedMan.push(await parseBoletin(p));
+    }
+
+    console.log(`Leyendo boletines app...`);
+    const parsedApp = [];
+    for (const p of pdfsApp) {
+      parsedApp.push(await parseBoletin(p));
+    }
+
+    console.log(`\nEmparejando y auditando...\n`);
+    let totalOk = 0;
+    let totalDiff = 0;
+    const unmatchedMan = [];
+    const matchedAppIndices = new Set();
+
+    for (const man of parsedMan) {
+      let appIdx = parsedApp.findIndex(
+        (a, i) => !matchedAppIndices.has(i) && man.estudiante.dni && a.estudiante.dni === man.estudiante.dni
+      );
+      if (appIdx === -1 && man.estudiante.alumno) {
+        const cleanManName = cleanText(man.estudiante.alumno).toLowerCase();
+        appIdx = parsedApp.findIndex((a, i) => {
+          if (matchedAppIndices.has(i)) return false;
+          const cleanAppName = cleanText(a.estudiante.alumno).toLowerCase();
+          return cleanManName === cleanAppName || cleanAppName.includes(cleanManName) || cleanManName.includes(cleanAppName);
+        });
+      }
+
+      const stName = man.estudiante.alumno || path.basename(man.fileName);
+      const stDni = man.estudiante.dni || 'Sin DNI';
+      const stCiclo = man.estudiante.ciclo || '';
+
+      if (appIdx === -1) {
+        unmatchedMan.push(stName);
+        console.log(`⚠️  [NO EMPAREJADO] ${stName} (DNI: ${stDni}) - Sin equivalente en app`);
+        continue;
+      }
+
+      matchedAppIndices.add(appIdx);
+      const app = parsedApp[appIdx];
+      const diffs = compare(man, app);
+
+      if (diffs.length === 0) {
+        totalOk++;
+        console.log(`✅ [OK] ${stName} (DNI: ${stDni} | ${stCiclo}) - 100% Coincidente (${man.materias.length} materias)`);
+      } else {
+        totalDiff++;
+        console.log(`❌ [DIFERENCIAS: ${diffs.length}] ${stName} (DNI: ${stDni} | ${stCiclo})`);
+        diffs.forEach((d) => {
+          console.log(`      * [${d.category}] ${d.subject ? d.subject + ' > ' : ''}${d.item}`);
+          console.log(`        Manual: ${d.manual} | App: ${d.app}`);
+        });
+      }
+    }
+
+    console.log(`\n======================================================`);
+    console.log(` RESUMEN DE LA AUDITORÍA DE LOTE`);
+    console.log(` Total emparejados: ${totalOk + totalDiff}`);
+    console.log(`  - 100% Coincidentes (OK): ${totalOk}`);
+    console.log(`  - Con Discrepancias:     ${totalDiff}`);
+    if (unmatchedMan.length > 0) {
+      console.log(`  - Manuales sin par:      ${unmatchedMan.length}`);
+    }
+    const unmatchedAppCount = parsedApp.length - matchedAppIndices.size;
+    if (unmatchedAppCount > 0) {
+      console.log(`  - App sin par:           ${unmatchedAppCount}`);
+    }
+    console.log(`======================================================\n`);
+    return;
+  }
+
+  // Modo archivo individual
   console.log(`\n========================================`);
   console.log(` AUDITOR DE BOLETINES (CLI)`);
   console.log(` Manual: ${fileMan}`);
@@ -399,4 +508,6 @@ async function main() {
   }
 }
 
-main().catch(console.error);
+if (process.argv[1] && (process.argv[1].endsWith('compare-cli.mjs') || process.argv[1].endsWith('compare-cli'))) {
+  main().catch(console.error);
+}

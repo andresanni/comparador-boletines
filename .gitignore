@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 scratch/
+prueba_cursos_completos/
 
 
 # Editor directories and files
