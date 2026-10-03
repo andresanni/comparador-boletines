@@ -5,6 +5,7 @@ import { DropZone } from './components/DropZone';
 import { SummaryCards } from './components/SummaryCards';
 import { StudentList } from './components/StudentList';
 import { DiffDetail } from './components/DiffDetail';
+import { BimestreSelector } from './components/BimestreSelector';
 import { parseBoletinPDF } from './core/parser';
 import { matchAndCompareBatch } from './core/batchMatcher';
 import type { BatchComparisonSummary } from './core/batchMatcher';
@@ -24,7 +25,11 @@ export function App() {
   const [summary, setSummary] = useState<BatchComparisonSummary | null>(null);
   const [selectedResult, setSelectedResult] = useState<ComparisonResult | null>(null);
   const [filter, setFilter] = useState<'all' | 'match' | 'diff' | 'unmatched'>('all');
-  const [config, setConfig] = useState<NormalizationConfig>(DEFAULT_NORMALIZATION);
+  const [activeBimestres, setActiveBimestres] = useState<number[]>([1, 2, 3, 4]);
+  const [config, setConfig] = useState<NormalizationConfig>({
+    ...DEFAULT_NORMALIZATION,
+    activeBimestres: [1, 2, 3, 4],
+  });
   const [isConfigOpen, setIsConfigOpen] = useState(false);
 
   // Quick Sample Loader
@@ -114,11 +119,27 @@ export function App() {
     }
   };
 
+  // Re-run diff if bimestres selection changes
+  const handleBimestresChange = (newBims: number[]) => {
+    setActiveBimestres(newBims);
+    const updatedConfig = { ...config, activeBimestres: newBims };
+    setConfig(updatedConfig);
+    if (manualDataList.length > 0 && appDataList.length > 0) {
+      const batchSummary = matchAndCompareBatch(manualDataList, appDataList, updatedConfig);
+      setSummary(batchSummary);
+      if (selectedResult) {
+        const updated = batchSummary.results.find((r) => r.studentDni === selectedResult.studentDni);
+        setSelectedResult(updated || batchSummary.results[0] || null);
+      }
+    }
+  };
+
   // Re-run diff if configuration is updated
   const handleConfigChange = (newConfig: NormalizationConfig) => {
-    setConfig(newConfig);
+    const updatedConfig = { ...newConfig, activeBimestres };
+    setConfig(updatedConfig);
     if (manualDataList.length > 0 && appDataList.length > 0) {
-      const batchSummary = matchAndCompareBatch(manualDataList, appDataList, newConfig);
+      const batchSummary = matchAndCompareBatch(manualDataList, appDataList, updatedConfig);
       setSummary(batchSummary);
       if (selectedResult) {
         const updated = batchSummary.results.find((r) => r.studentDni === selectedResult.studentDni);
@@ -135,6 +156,7 @@ export function App() {
     setSummary(null);
     setSelectedResult(null);
     setFilter('all');
+    setActiveBimestres([1, 2, 3, 4]);
   };
 
   const exportAllAuditCsv = () => {
@@ -222,6 +244,12 @@ export function App() {
               </button>
             </div>
 
+            {/* Bimestres Selector */}
+            <BimestreSelector
+              activeBimestres={activeBimestres}
+              onChange={handleBimestresChange}
+            />
+
             <SummaryCards
               total={summary.totalPairs}
               matching={summary.matchingCount}
@@ -246,7 +274,7 @@ export function App() {
 
               <div className="lg:col-span-8 xl:col-span-8">
                 {selectedResult ? (
-                  <DiffDetail result={selectedResult} />
+                  <DiffDetail result={selectedResult} activeBimestres={activeBimestres} />
                 ) : (
                   <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-12 text-center text-slate-500 text-sm">
                     Selecciona un alumno de la lista para inspeccionar el detalle.

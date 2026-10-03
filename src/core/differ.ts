@@ -87,6 +87,10 @@ export function compareBoletines(
     app.apoyos.cuales
   );
 
+  const activeBims = config.activeBimestres && config.activeBimestres.length > 0
+    ? config.activeBimestres
+    : [1, 2, 3, 4];
+
   // 3. Materias y Calificaciones
   for (const mMan of manual.materias) {
     // Normalizar nombre de materia para búsqueda flexible (ej. '/' vs '-')
@@ -114,13 +118,16 @@ export function compareBoletines(
     // Calificación General
     if (mMan.calificacionGeneral && mApp.calificacionGeneral) {
       for (let b = 0; b < 4; b++) {
+        const bimNumber = b + 1;
+        if (!activeBims.includes(bimNumber)) continue;
+
         addDiff(
           'Calificación General',
-          `Calificación General Bimestre ${b + 1}`,
+          `Calificación General Bimestre ${bimNumber}`,
           mMan.calificacionGeneral[b],
           mApp.calificacionGeneral[b],
           mMan.nombre,
-          b + 1
+          bimNumber
         );
       }
     }
@@ -142,13 +149,16 @@ export function compareBoletines(
       }
 
       for (let b = 0; b < 4; b++) {
+        const bimNumber = b + 1;
+        if (!activeBims.includes(bimNumber)) continue;
+
         addDiff(
           'Calificación Criterio',
-          `Criterio: "${cMan.label}" (Bim. ${b + 1})`,
+          `Criterio: "${cMan.label}" (Bim. ${bimNumber})`,
           cMan.bimestres[b],
           cApp.bimestres[b],
           mMan.nombre,
-          b + 1
+          bimNumber
         );
       }
     }
@@ -156,6 +166,9 @@ export function compareBoletines(
 
   // 4. Asistencia
   for (let b = 0; b < 4; b++) {
+    const bimNumber = b + 1;
+    if (!activeBims.includes(bimNumber)) continue;
+
     const aMan = manual.asistencias[b] || {
       asistencias: '',
       inasistencias: '',
@@ -171,35 +184,35 @@ export function compareBoletines(
 
     addDiff(
       'Asistencia',
-      `Asistencias Bimestre ${b + 1}`,
+      `Asistencias Bimestre ${bimNumber}`,
       aMan.asistencias,
       aApp.asistencias,
       undefined,
-      b + 1
+      bimNumber
     );
     addDiff(
       'Inasistencia',
-      `Inasistencias Bimestre ${b + 1}`,
+      `Inasistencias Bimestre ${bimNumber}`,
       aMan.inasistencias,
       aApp.inasistencias,
       undefined,
-      b + 1
+      bimNumber
     );
     addDiff(
       'Llegadas Tarde',
-      `Llegadas tarde Bimestre ${b + 1}`,
+      `Llegadas tarde Bimestre ${bimNumber}`,
       aMan.llegadasTarde,
       aApp.llegadasTarde,
       undefined,
-      b + 1
+      bimNumber
     );
     addDiff(
       'Observaciones',
-      `Observaciones Bimestre ${b + 1}`,
+      `Observaciones Bimestre ${bimNumber}`,
       aMan.observaciones,
       aApp.observaciones,
       undefined,
-      b + 1
+      bimNumber
     );
   }
 

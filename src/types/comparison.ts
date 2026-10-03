@@ -50,6 +50,7 @@ export interface NormalizationConfig {
   normalizeAccents: boolean;     // Ignorar tildes si es necesario en observaciones
   ignorePunctuation: boolean;    // Ignorar puntos finales en observaciones
   flexibleStudentNames: boolean; // Tolerar comas, espacios y formato en nombres de alumnos
+  activeBimestres: number[];     // Bimestres a auditar (ej. [1, 2, 3, 4] o [2])
 }
 
 export const DEFAULT_NORMALIZATION: NormalizationConfig = {
@@ -60,5 +61,6 @@ export const DEFAULT_NORMALIZATION: NormalizationConfig = {
   normalizeAccents: false,
   ignorePunctuation: false,
   flexibleStudentNames: true,
+  activeBimestres: [1, 2, 3, 4],
 };
 

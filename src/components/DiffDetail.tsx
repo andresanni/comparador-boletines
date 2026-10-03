@@ -12,11 +12,13 @@ import { DEFAULT_NORMALIZATION } from '../types/comparison';
 
 interface DiffDetailProps {
   result: ComparisonResult;
+  activeBimestres?: number[];
 }
 
-export const DiffDetail: React.FC<DiffDetailProps> = ({ result }) => {
+export const DiffDetail: React.FC<DiffDetailProps> = ({ result, activeBimestres }) => {
   const [onlyDiffs, setOnlyDiffs] = useState<boolean>(!result.isMatch);
 
+  const activeBims = activeBimestres && activeBimestres.length > 0 ? activeBimestres : [1, 2, 3, 4];
   const { manualData, appData, differences } = result;
 
   const exportStudentJson = () => {
@@ -239,10 +241,23 @@ export const DiffDetail: React.FC<DiffDetailProps> = ({ result }) => {
                       <thead>
                         <tr className="border-b border-slate-800/80 text-[11px] text-slate-400 bg-slate-900/40">
                           <th className="py-2 px-3">Criterio / Calificación</th>
-                          <th className="py-2 px-3 text-center w-28">1° Bimestre</th>
-                          <th className="py-2 px-3 text-center w-28">2° Bimestre</th>
-                          <th className="py-2 px-3 text-center w-28">3° Bimestre</th>
-                          <th className="py-2 px-3 text-center w-28">4° Bimestre</th>
+                          {[0, 1, 2, 3].map((b) => {
+                            const bimNum = b + 1;
+                            const isAuditActive = activeBims.includes(bimNum);
+                            return (
+                              <th
+                                key={`th-crit-${bimNum}`}
+                                className={`py-2 px-3 text-center w-28 ${
+                                  isAuditActive ? 'text-slate-300' : 'text-slate-600 opacity-40 font-normal'
+                                }`}
+                              >
+                                {bimNum}° Bimestre
+                                {!isAuditActive && (
+                                  <span className="block text-[9px] text-slate-500 font-normal">(Omitido)</span>
+                                )}
+                              </th>
+                            );
+                          })}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-800/50">
@@ -254,9 +269,23 @@ export const DiffDetail: React.FC<DiffDetailProps> = ({ result }) => {
                                 {cMan.label}
                               </td>
                               {[0, 1, 2, 3].map((b) => {
+                                const bimNum = b + 1;
+                                const isAuditActive = activeBims.includes(bimNum);
                                 const valMan = cMan.bimestres[b] || '';
                                 const valApp = cApp ? cApp.bimestres[b] || '' : '';
                                 const match = areEquivalent(valMan, valApp, DEFAULT_NORMALIZATION);
+
+                                if (!isAuditActive) {
+                                  return (
+                                    <td
+                                      key={`col-${b}`}
+                                      className="py-2 px-3 text-center font-mono text-[11px] text-slate-600 opacity-40 bg-slate-950/20"
+                                      title="Bimestre excluido de la auditoría"
+                                    >
+                                      {valMan || '-'}
+                                    </td>
+                                  );
+                                }
 
                                 return (
                                   <td
@@ -291,9 +320,23 @@ export const DiffDetail: React.FC<DiffDetailProps> = ({ result }) => {
                               CALIFICACIÓN GENERAL
                             </td>
                             {[0, 1, 2, 3].map((b) => {
+                              const bimNum = b + 1;
+                              const isAuditActive = activeBims.includes(bimNum);
                               const valMan = mMan.calificacionGeneral![b] || '';
                               const valApp = mApp?.calificacionGeneral?.[b] || '';
                               const match = areEquivalent(valMan, valApp, DEFAULT_NORMALIZATION);
+
+                              if (!isAuditActive) {
+                                return (
+                                  <td
+                                    key={`gen-${b}`}
+                                    className="py-2 px-3 text-center font-mono text-[11px] text-slate-600 opacity-40 bg-slate-950/20"
+                                    title="Bimestre excluido de la auditoría"
+                                  >
+                                    {valMan || '-'}
+                                  </td>
+                                );
+                              }
 
                               return (
                                 <td
@@ -342,6 +385,8 @@ export const DiffDetail: React.FC<DiffDetailProps> = ({ result }) => {
                   </thead>
                   <tbody className="divide-y divide-slate-800/50 text-[11px]">
                     {[0, 1, 2, 3].map((b) => {
+                      const bimNum = b + 1;
+                      const isAuditActive = activeBims.includes(bimNum);
                       const aMan = manualData.asistencias[b] || {
                         asistencias: '',
                         inasistencias: '',
@@ -360,10 +405,24 @@ export const DiffDetail: React.FC<DiffDetailProps> = ({ result }) => {
                       const tardeMatch = areEquivalent(aMan.llegadasTarde, aApp.llegadasTarde, DEFAULT_NORMALIZATION);
                       const obsMatch = areEquivalent(aMan.observaciones, aApp.observaciones, DEFAULT_NORMALIZATION);
 
+                      if (!isAuditActive) {
+                        return (
+                          <tr key={`asis-${b}`} className="opacity-40 text-slate-500 bg-slate-950/20">
+                            <td className="py-2 px-3 font-semibold text-slate-500">
+                              {bimNum}° Bimestre <span className="text-[9px] font-normal">(Omitido)</span>
+                            </td>
+                            <td className="py-2 px-3 text-center font-mono">{aMan.asistencias || '-'}</td>
+                            <td className="py-2 px-3 text-center font-mono">{aMan.inasistencias || '-'}</td>
+                            <td className="py-2 px-3 text-center font-mono">{aMan.llegadasTarde || '-'}</td>
+                            <td className="py-2 px-3 text-slate-500">{aMan.observaciones || '-'}</td>
+                          </tr>
+                        );
+                      }
+
                       return (
                         <tr key={`asis-${b}`}>
                           <td className="py-2 px-3 font-semibold text-slate-300">
-                            {b + 1}° Bimestre
+                            {bimNum}° Bimestre
                           </td>
                           <td className={`py-2 px-3 text-center font-mono ${asisMatch ? 'text-slate-300' : 'bg-rose-950/40 text-rose-300 font-bold'}`}>
                             {asisMatch ? aMan.asistencias || '-' : `${aMan.asistencias} / ${aApp.asistencias}`}

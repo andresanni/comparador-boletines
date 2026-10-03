@@ -355,11 +355,12 @@ export async function parseBoletin(filePath) {
   };
 }
 
-function compare(manual, app) {
+function compare(manual, app, activeBims = [1, 2, 3, 4]) {
   const diffs = [];
-  function check(cat, item, vMan, vApp, subj) {
+
+  function check(cat, item, vMan, vApp, subj, bim) {
     if (!areEquivalent(vMan, vApp)) {
-      diffs.push({ category: cat, item, subject: subj, manual: vMan || '(vacío)', app: vApp || '(vacío)' });
+      diffs.push({ category: cat, item, subject: subj, bimestre: bim, manual: vMan || '(vacío)', app: vApp || '(vacío)' });
     }
   }
 
@@ -385,7 +386,8 @@ function compare(manual, app) {
     if (mMan.ppi || mApp.ppi) check('PPI', 'Estado PPI', mMan.ppi, mApp.ppi, mMan.nombre);
     if (mMan.calificacionGeneral && mApp.calificacionGeneral) {
       for (let b = 0; b < 4; b++) {
-        check('Calificación General', `Bimestre ${b + 1}`, mMan.calificacionGeneral[b], mApp.calificacionGeneral[b], mMan.nombre);
+        if (!activeBims.includes(b + 1)) continue;
+        check('Calificación General', `Bimestre ${b + 1}`, mMan.calificacionGeneral[b], mApp.calificacionGeneral[b], mMan.nombre, b + 1);
       }
     }
     for (let c = 0; c < mMan.criterios.length; c++) {
@@ -393,18 +395,20 @@ function compare(manual, app) {
       const cApp = mApp.criterios[c];
       if (!cApp) continue;
       for (let b = 0; b < 4; b++) {
-        check('Criterio', `"${cMan.label.slice(0, 30)}..." Bim ${b + 1}`, cMan.bimestres[b], cApp.bimestres[b], mMan.nombre);
+        if (!activeBims.includes(b + 1)) continue;
+        check('Criterio', `"${cMan.label.slice(0, 30)}..." Bim ${b + 1}`, cMan.bimestres[b], cApp.bimestres[b], mMan.nombre, b + 1);
       }
     }
   }
 
   for (let b = 0; b < 4; b++) {
+    if (!activeBims.includes(b + 1)) continue;
     const aMan = manual.asistencias[b] || {};
     const aApp = app.asistencias[b] || {};
-    check('Asistencia', `Asistencias Bim ${b + 1}`, aMan.asistencias, aApp.asistencias);
-    check('Inasistencia', `Inasistencias Bim ${b + 1}`, aMan.inasistencias, aApp.inasistencias);
-    check('Llegadas Tarde', `Llegadas tarde Bim ${b + 1}`, aMan.llegadasTarde, aApp.llegadasTarde);
-    check('Observaciones', `Observaciones Bim ${b + 1}`, aMan.observaciones, aApp.observaciones);
+    check('Asistencia', `Asistencias Bim ${b + 1}`, aMan.asistencias, aApp.asistencias, undefined, b + 1);
+    check('Inasistencia', `Inasistencias Bim ${b + 1}`, aMan.inasistencias, aApp.inasistencias, undefined, b + 1);
+    check('Llegadas Tarde', `Llegadas tarde Bim ${b + 1}`, aMan.llegadasTarde, aApp.llegadasTarde, undefined, b + 1);
+    check('Observaciones', `Observaciones Bim ${b + 1}`, aMan.observaciones, aApp.observaciones, undefined, b + 1);
   }
 
   return diffs;
@@ -425,9 +429,25 @@ function findPdfFiles(dir) {
 }
 
 async function main() {
-  const args = process.argv.slice(2);
-  const fileMan = args[0] || 'samples/boletin_manual_oriana.pdf';
-  const fileApp = args[1] || 'samples/boletin_app_oriana.pdf';
+  const rawArgs = process.argv.slice(2);
+  let activeBims = [1, 2, 3, 4];
+  const bimArgIdx = rawArgs.findIndex(a => a === '--bimestres' || a === '--bimestre' || a.startsWith('--bimestres=') || a.startsWith('--bimestre='));
+  if (bimArgIdx !== -1) {
+    let val = '';
+    if (rawArgs[bimArgIdx].includes('=')) {
+      val = rawArgs[bimArgIdx].split('=')[1];
+      rawArgs.splice(bimArgIdx, 1);
+    } else {
+      val = rawArgs[bimArgIdx + 1];
+      rawArgs.splice(bimArgIdx, 2);
+    }
+    if (val) {
+      activeBims = val.split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n) && n >= 1 && n <= 4);
+    }
+  }
+
+  const fileMan = rawArgs[0] || 'samples/boletin_manual_oriana.pdf';
+  const fileApp = rawArgs[1] || 'samples/boletin_app_oriana.pdf';
 
   if (!fs.existsSync(fileMan) || !fs.existsSync(fileApp)) {
     console.error(`Error: No se encontró uno de los archivos o directorios:\n  Manual: ${fileMan}\n  App: ${fileApp}`);
@@ -442,6 +462,7 @@ async function main() {
     console.log(` AUDITOR DE BOLETINES (CLI) - COMPARACIÓN POR LOTE`);
     console.log(` Manual: ${fileMan}`);
     console.log(` App:    ${fileApp}`);
+    console.log(` Bimestres auditados: ${activeBims.map(b => b + '°').join(', ')}`);
     console.log(`======================================================\n`);
 
     const pdfsMan = findPdfFiles(fileMan);
@@ -492,11 +513,11 @@ async function main() {
 
       matchedAppIndices.add(appIdx);
       const app = parsedApp[appIdx];
-      const diffs = compare(man, app);
+      const diffs = compare(man, app, activeBims);
 
       if (diffs.length === 0) {
         totalOk++;
-        console.log(`✅ [OK] ${stName} (DNI: ${stDni} | ${stCiclo}) - 100% Coincidente (${man.materias.length} materias)`);
+        console.log(`✅ [OK] ${stName} (DNI: ${stDni} | ${stCiclo}) - 100% Coincidente`);
       } else {
         totalDiff++;
         console.log(`❌ [DIFERENCIAS: ${diffs.length}] ${stName} (DNI: ${stDni} | ${stCiclo})`);
@@ -509,6 +530,7 @@ async function main() {
 
     console.log(`\n======================================================`);
     console.log(` RESUMEN DE LA AUDITORÍA DE LOTE`);
+    console.log(` Bimestres considerados: ${activeBims.map(b => b + '°').join(', ')}`);
     console.log(` Total emparejados: ${totalOk + totalDiff}`);
     console.log(`  - 100% Coincidentes (OK): ${totalOk}`);
     console.log(`  - Con Discrepancias:     ${totalDiff}`);
@@ -528,6 +550,7 @@ async function main() {
   console.log(` AUDITOR DE BOLETINES (CLI)`);
   console.log(` Manual: ${fileMan}`);
   console.log(` App:    ${fileApp}`);
+  console.log(` Bimestres auditados: ${activeBims.map(b => b + '°').join(', ')}`);
   console.log(`========================================\n`);
 
   const man = await parseBoletin(fileMan);
@@ -539,7 +562,7 @@ async function main() {
   console.log(`Estudiante: ${man.estudiante.alumno || app.estudiante.alumno} (DNI: ${man.estudiante.dni || app.estudiante.dni} | ${gradoInfo} "${seccionInfo}" | ${cicloInfo})`);
   console.log(`Materias auditadas: ${man.materias.length}`);
 
-  const diffs = compare(man, app);
+  const diffs = compare(man, app, activeBims);
 
   if (diffs.length === 0) {
     console.log(`\n✅ ¡INTEGRIDAD 100% VERIFICADA! No se encontraron diferencias.`);
