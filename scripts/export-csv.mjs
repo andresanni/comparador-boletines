@@ -92,7 +92,11 @@ function generateCsvRow(boletin, bimestre, is2doCiclo) {
   }
 
   const values = [];
-  values.push(escapeCsvField(boletin.estudiante.alumno || 'Sin Nombre'));
+  const cleanName = (boletin.estudiante.alumno || 'Sin Nombre')
+    .replace(/\s*,\s*/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  values.push(escapeCsvField(cleanName));
 
   for (const sKey of subjectOrder) {
     const m = mMap.get(sKey);

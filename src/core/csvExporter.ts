@@ -42,6 +42,19 @@ export function formatPpiForCsv(val: string | undefined): string {
 }
 
 /**
+ * Normaliza el nombre del alumno para el CSV eliminando comas
+ * (ej: "De los Santos, Oriana Sofia" -> "De los Santos Oriana Sofia")
+ * garantizando que nunca se produzca un salto de columna indeseado al pegar o importar.
+ */
+export function cleanStudentNameForCsv(name: string | undefined | null): string {
+  if (!name) return 'Sin Nombre';
+  return name
+    .replace(/\s*,\s*/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
  * Escapa valores para cumplir el estándar RFC-4180 de CSV.
  * Rodea con comillas dobles si contiene comas, comillas dobles o saltos de línea.
  */
@@ -131,8 +144,8 @@ export function getBoletinCsvValues(
 
   const values: string[] = [];
 
-  // 1. alumno_nombre
-  values.push(boletin.estudiante.alumno || 'Sin Nombre');
+  // 1. alumno_nombre (sin comas para evitar desfases al separar por comas en Sheets/Excel)
+  values.push(cleanStudentNameForCsv(boletin.estudiante.alumno));
 
   // 2. Materias
   for (const sKey of subjectOrder) {
@@ -236,6 +249,31 @@ export function generateFullCsv(
 
   // UTF-8 BOM
   return '\uFEFF' + lines.join('\r\n');
+}
+
+/**
+ * Genera el contenido formateado con Tabulaciones (TSV)
+ * para pegar directamente en Google Sheets o Excel con Ctrl+V
+ * sin necesidad de usar "Dividir texto en columnas".
+ */
+export function generateFullTsv(
+  boletines: BoletinData[],
+  bimestre: number,
+  forcedCiclo?: '1er Ciclo' | '2do Ciclo'
+): string {
+  const is2doCiclo = forcedCiclo
+    ? forcedCiclo === '2do Ciclo'
+    : detectIs2doCiclo(boletines);
+
+  const lines: string[] = [];
+  lines.push(getCsvHeaderList(is2doCiclo).join('\t'));
+
+  for (const b of boletines) {
+    const rawValues = getBoletinCsvValues(b, bimestre, is2doCiclo);
+    lines.push(rawValues.join('\t'));
+  }
+
+  return lines.join('\r\n');
 }
 
 /**

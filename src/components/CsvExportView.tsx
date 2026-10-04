@@ -16,6 +16,7 @@ import {
   getCsvHeaderList,
   getBoletinCsvValues,
   generateFullCsv,
+  generateFullTsv,
   downloadCsvFile,
   detectIs2doCiclo,
 } from '../core/csvExporter';
@@ -27,6 +28,7 @@ export const CsvExportView: React.FC = () => {
   const [copied, setCopied] = useState<boolean>(false);
   const [searchFilter, setSearchFilter] = useState<string>('');
   const [showRawCsv, setShowRawCsv] = useState<boolean>(false);
+  const [copiedTsv, setCopiedTsv] = useState<boolean>(false);
   const [forcedCiclo, setForcedCiclo] = useState<'auto' | '1er Ciclo' | '2do Ciclo'>('auto');
 
   // Carga de PDFs
@@ -90,6 +92,16 @@ export const CsvExportView: React.FC = () => {
     );
   }, [boletines, selectedBimestre, forcedCiclo]);
 
+  // TSV para pegar directamente en Google Sheets o Excel con Ctrl+V
+  const tsvContent = useMemo(() => {
+    if (boletines.length === 0) return '';
+    return generateFullTsv(
+      boletines,
+      selectedBimestre,
+      forcedCiclo === 'auto' ? undefined : forcedCiclo
+    );
+  }, [boletines, selectedBimestre, forcedCiclo]);
+
   const handleDownload = () => {
     if (!csvContent) return;
     const grado = boletines[0]?.estudiante?.grado
@@ -110,6 +122,17 @@ export const CsvExportView: React.FC = () => {
       setTimeout(() => setCopied(false), 2200);
     } catch (err) {
       console.error('Error al copiar CSV:', err);
+    }
+  };
+
+  const handleCopyTsv = async () => {
+    if (!tsvContent) return;
+    try {
+      await navigator.clipboard.writeText(tsvContent);
+      setCopiedTsv(true);
+      setTimeout(() => setCopiedTsv(false), 2200);
+    } catch (err) {
+      console.error('Error al copiar TSV para Sheets:', err);
     }
   };
 
@@ -142,16 +165,26 @@ export const CsvExportView: React.FC = () => {
         {boletines.length > 0 && (
           <div className="flex items-center gap-2.5 flex-wrap">
             <button
-              onClick={handleCopy}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-all shadow-sm active:scale-95"
+              onClick={handleCopyTsv}
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-semibold transition-all shadow-sm active:scale-95"
+              title="Copia en formato de tabla para pegar con Ctrl+V directamente en Google Sheets o Excel sin desfasaje"
             >
-              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
+              {copiedTsv ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-emerald-400" />}
+              {copiedTsv ? '¡Copiado para Sheets!' : 'Copiar para Sheets (Pegar Directo)'}
+            </button>
+
+            <button
+              onClick={handleCopy}
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-all shadow-sm active:scale-95"
+              title="Copia el texto plano en formato CSV"
+            >
+              {copied ? <Check className="w-3.5 h-3.5 text-indigo-400" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
               {copied ? '¡Copiado!' : 'Copiar CSV'}
             </button>
 
             <button
               onClick={handleDownload}
-              className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-all shadow-md hover:shadow-indigo-500/25 active:scale-95"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-all shadow-md hover:shadow-indigo-500/25 active:scale-95"
             >
               <Download className="w-4 h-4" />
               Descargar CSV
