@@ -385,8 +385,11 @@ export async function parseBoletinPDF(
       const mTarde = pageText.match(/Llegadas tarde\s+([^\s]+)/i);
       if (mTarde) asis.llegadasTarde = cleanText(mTarde[1]);
 
-      const mObs = pageText.match(/Observaciones\s+([^Firma]+)/i);
-      if (mObs) asis.observaciones = cleanText(mObs[1]);
+      const mObs = pageText.match(/Observaciones\s*([\s\S]*?)(?=Firma|Escala|República|$)/i);
+      if (mObs) {
+        const cleaned = cleanText(mObs[1]);
+        asis.observaciones = (cleaned === '---' || cleaned === '--' || cleaned === '-' || cleaned === '—') ? '' : cleaned;
+      }
 
       asistencias.push(asis);
       continue;

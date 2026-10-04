@@ -6,6 +6,7 @@ import { SummaryCards } from './components/SummaryCards';
 import { StudentList } from './components/StudentList';
 import { DiffDetail } from './components/DiffDetail';
 import { BimestreSelector } from './components/BimestreSelector';
+import { CsvExportView } from './components/CsvExportView';
 import { parseBoletinPDF } from './core/parser';
 import { matchAndCompareBatch } from './core/batchMatcher';
 import type { BatchComparisonSummary } from './core/batchMatcher';
@@ -15,6 +16,7 @@ import type { BoletinData } from './types/boletin';
 import { Download } from 'lucide-react';
 
 export function App() {
+  const [activeTab, setActiveTab] = useState<'auditor' | 'exporter'>('auditor');
   const [manualFiles, setManualFiles] = useState<File[]>([]);
   const [appFiles, setAppFiles] = useState<File[]>([]);
   const [manualDataList, setManualDataList] = useState<BoletinData[]>([]);
@@ -193,14 +195,17 @@ export function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
       <Header
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
         onOpenSettings={() => setIsConfigOpen(true)}
         onReset={handleReset}
         hasData={!!summary}
       />
 
       <main className="flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* If no comparison summary yet, show upload Dropzone */}
-        {!summary ? (
+        {activeTab === 'exporter' ? (
+          <CsvExportView />
+        ) : !summary ? (
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">

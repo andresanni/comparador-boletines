@@ -319,13 +319,15 @@ export async function parseBoletin(filePath) {
       const mAsis = pageText.match(/Asistencias\s+([^\s]+)/i);
       const mInas = pageText.match(/Inasistencias\s+([^\s]+)/i);
       const mTarde = pageText.match(/Llegadas tarde\s+([^\s]+)/i);
-      const mObs = pageText.match(/Observaciones\s+([^Firma]+)/i);
+      const mObs = pageText.match(/Observaciones\s*([\s\S]*?)(?=Firma|Escala|República|$)/i);
+      let obsClean = mObs ? cleanText(mObs[1]) : '';
+      if (obsClean === '---' || obsClean === '--' || obsClean === '-' || obsClean === '—') obsClean = '';
       asistencias.push({
         bimestre: bim,
         asistencias: mAsis ? cleanText(mAsis[1]) : '',
         inasistencias: mInas ? cleanText(mInas[1]) : '',
         llegadasTarde: mTarde ? cleanText(mTarde[1]) : '',
-        observaciones: mObs ? cleanText(mObs[1]) : '',
+        observaciones: obsClean,
       });
       continue;
     }
