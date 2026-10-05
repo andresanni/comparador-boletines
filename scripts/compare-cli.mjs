@@ -122,6 +122,45 @@ async function getPageItems(page) {
     }));
 }
 
+const GRADE_SPLIT_REGEX = /^(NO CORRESPONDE A LA PLANIFICACI[ÓO]N DEL BIMESTRE|NO CORRESPONDE A LA PLANIFICACION DEL BIMESTRE|NO ALCANZ[ÓO] LOS OBJETIVOS|EN PROCESO|DESTACADO|AVANZADO|ALCANZADO)(\s+\d+)?/i;
+const COL_X = [351, 412, 475, 535];
+
+function expandMergedEvaluationItems(items) {
+  const result = [];
+  for (const item of items) {
+    if (item.x < 335) {
+      result.push(item);
+      continue;
+    }
+    let remaining = item.str.trim();
+    const matched = [];
+    while (remaining.length > 0) {
+      const m = remaining.match(GRADE_SPLIT_REGEX);
+      if (m) {
+        matched.push(m[0].trim());
+        remaining = remaining.slice(m[0].length).trim();
+      } else {
+        break;
+      }
+    }
+    if (matched.length > 1 && remaining.length === 0) {
+      const startCol = getCol(item.x);
+      const baseCol = startCol >= 0 ? startCol : 0;
+      for (let k = 0; k < matched.length; k++) {
+        const targetCol = Math.min(3, baseCol + k);
+        result.push({
+          str: matched[k],
+          x: COL_X[targetCol] ?? (item.x + k * 60),
+          y: item.y,
+        });
+      }
+    } else {
+      result.push(item);
+    }
+  }
+  return result;
+}
+
 export async function parseBoletin(filePath) {
   const data = new Uint8Array(fs.readFileSync(filePath));
   const doc = await pdfjsLib.getDocument({ data }).promise;
@@ -181,7 +220,8 @@ export async function parseBoletin(filePath) {
   let p3Parsed = false;
   for (let pNum = 3; pNum <= numPages; pNum++) {
     const page = await doc.getPage(pNum);
-    const items = (await getPageItems(page)).filter((i) => i.y > 70 && i.y < 795);
+    const rawItems = (await getPageItems(page)).filter((i) => i.y > 70 && i.y < 795);
+    const items = expandMergedEvaluationItems(rawItems);
     const pageText = items.map((i) => i.str).join(' ');
 
     // Page 3
